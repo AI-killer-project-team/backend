@@ -1,4 +1,5 @@
-﻿from typing import Optional
+﻿from pathlib import Path
+from typing import Optional
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 
 from app.schemas.question import QuestionNextRequest, QuestionOut, AnswerSubmitRequest, AnswerAudioResponse
@@ -7,6 +8,9 @@ from app.services.timing_analyzer import record_answer_time
 from app.core.config import settings
 
 router = APIRouter()
+
+_LOG_DIR = Path(__file__).resolve().parents[1] / "logs"
+_ANSWER_LOG = _LOG_DIR / "answers.log"
 
 
 @router.post("/next", response_model=QuestionOut)
@@ -66,12 +70,22 @@ async def submit_answer_audio(
         try:
             result = client.audio.transcriptions.create(
                 model=settings.openai_stt_model,
-                file=audio.file,
+                file=(audio.filename or "answer.webm", audio.file, audio.content_type or "audio/webm"),
                 response_format="text",
             )
             transcript = str(result).strip() if result else None
         except Exception:
             transcript = None
+
+    try:
+        _LOG_DIR.mkdir(parents=True, exist_ok=True)
+        _ANSWER_LOG.open("a", encoding="utf-8").write(
+            f"[answer_audio] session_id={session_id} question_id={question_id} "
+            f"seconds={answer_seconds} filename={audio.filename} content_type={audio.content_type} "
+            f"transcript_len={len(transcript or '')}\n"
+        )
+    except Exception:
+        pass
 
     if transcript:
         transcript = transcript.strip()
