@@ -94,6 +94,10 @@ def _generate_questions_rule_based(
         else:
             questions.append(f"{point}과 관련된 경험을 구체적으로 설명해 주세요.")
 
+    if style == "pressure":
+        questions.append("성과를 근거와 수치로 설명해 주세요.")
+        questions.append("그 판단의 리스크는 무엇이었나요?")
+
     while len(questions) < count:
         if style == "pressure":
             questions.append("가장 어려웠던 상황과 해결 과정을 핵심만 말해 주세요.")
@@ -159,21 +163,40 @@ def _generate_questions_llm(
             "question_count": count,
             "first_question_fixed": "자기소개 질문(스타일에 맞게 말투만 변경 가능)",
             "output_format": "JSON array of strings",
+            "max_sentence": 2,
+            "max_characters": 100,
+            "forbidden_topics": [
+                "정치",
+                "종교",
+                "가족/출신",
+                "건강/질병",
+                "나이/성별",
+                "혼인/임신",
+                "국적/인종"
+            ],
+        },
+        "style_guidance": {
+            "pressure": [
+                "Include at least one question asking for evidence or metrics.",
+                "Include at least one question probing risks or trade-offs."
+            ]
         },
     }
 
     system_text = (
-        "You are an interview question generator. "
-        "Generate concise, realistic interview questions in Korean. "
-        "Adjust the wording to match the interview_style (friendly/pressure/neutral). "
-        "Return ONLY a JSON array of strings. "
-        "The first question must be a self-introduction question in the same style."
+        "당신은 면접 질문을 생성하는 코치입니다. "
+        "한국어로 간결하고 현실적인 질문을 만들어 주세요. "
+        "interview_style에 맞게 문장 톤을 조정하세요 (friendly/pressure/neutral). "
+        "모든 질문은 1~3문장, 100자 이내로 작성하세요. "
+        "민감/차별 가능 주제(정치, 종교, 가족/출신, 건강/질병, 나이/성별, 혼인/임신, 국적/인종)는 제외하세요. "
+        "출력은 반드시 JSON 문자열 배열만 반환하세요. "
+        "첫 질문은 반드시 자기소개 질문이어야 하며, 스타일 톤을 반영하세요."
     )
 
     user_text = (
-        "Use the following context to generate questions. "
-        "Ensure the questions fit the company and role, and avoid duplicates.\n"
-        f"Context: {json.dumps(prompt, ensure_ascii=False)}"
+        "아래 컨텍스트를 바탕으로 질문을 생성해 주세요. "
+        "회사/직무/지원자 맥락에 맞게 질문을 구성하고 중복은 피하세요.\n"
+        f"컨텍스트: {json.dumps(prompt, ensure_ascii=False)}"
     )
 
     client = OpenAI(api_key=settings.openai_api_key)
@@ -200,7 +223,7 @@ def _generate_questions_llm(
 
     if not questions or "자기소개" not in questions[0]:
         if style == "pressure":
-            first = "자기소개를 1분 내로 핵심만 말해 주세요."
+            first = "자기소개 해 주세요."
         elif style == "friendly":
             first = "편하게 자기소개 부탁드립니다."
         else:
