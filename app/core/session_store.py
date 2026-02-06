@@ -22,6 +22,10 @@ class Session:
     resume_text: Optional[str]
     self_intro_text: Optional[str]
     jd_text: Optional[str]
+    voice: Optional[str]
+    style: Optional[str]
+    tts_instructions: Optional[str]
+    tts_speed: Optional[float]
     questions: List[dict]
     answers: Dict[str, AnswerRecord] = field(default_factory=dict)
     current_index: int = 0
@@ -39,6 +43,10 @@ class SessionStore:
         resume_text: Optional[str],
         self_intro_text: Optional[str],
         jd_text: Optional[str],
+        voice: Optional[str],
+        style: Optional[str],
+        tts_instructions: Optional[str],
+        tts_speed: Optional[float],
         questions: List[dict],
     ) -> Session:
         session_id = str(uuid.uuid4())
@@ -49,6 +57,10 @@ class SessionStore:
             resume_text=resume_text,
             self_intro_text=self_intro_text,
             jd_text=jd_text,
+            voice=voice,
+            style=style,
+            tts_instructions=tts_instructions,
+            tts_speed=tts_speed,
             questions=questions,
         )
         self._sessions[session_id] = session

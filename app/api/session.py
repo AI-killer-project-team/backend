@@ -1,10 +1,11 @@
-﻿from fastapi import APIRouter, HTTPException
-from app.schemas.session import SessionStartRequest, SessionStartResponse, SessionEndRequest
+﻿from fastapi import APIRouter, HTTPException, UploadFile, File
+from app.schemas.session import SessionStartRequest, SessionStartResponse, SessionEndRequest, DocParseResponse
 from app.schemas.question import QuestionOut
 from app.core.session_store import session_store
 from app.services.question_generator import generate_questions
 from app.services.company_data import load_company, find_job
 from app.core.config import settings
+from app.services.doc_parser import extract_text_from_upload
 
 router = APIRouter()
 
@@ -36,6 +37,10 @@ def start_session(payload: SessionStartRequest):
         resume_text=payload.resume_text,
         self_intro_text=payload.self_intro_text,
         jd_text=payload.jd_text,
+        voice=payload.voice,
+        style=payload.style,
+        tts_instructions=payload.tts_instructions,
+        tts_speed=payload.tts_speed,
         questions=questions,
     )
 
@@ -58,3 +63,10 @@ def end_session(payload: SessionEndRequest):
 
     session_store.end_session(payload.session_id)
     return {"status": "ended"}
+
+
+@router.post("/parse-doc", response_model=DocParseResponse)
+async def parse_doc(file: UploadFile = File(...)):
+    file.file.seek(0)
+    text = extract_text_from_upload(file.file, file.filename)
+    return DocParseResponse(text=text)

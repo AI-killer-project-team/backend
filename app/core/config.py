@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     openai_max_output_tokens: int = 512
     openai_stt_model: str = "gpt-4o-mini-transcribe"
     openai_eval_model: Optional[str] = None
+    openai_tts_model: str = "gpt-4o-mini-tts"
+    tts_default_voice: str = "alloy"
+    tts_default_speed: float = 1.0
 
     class Config:
         env_file = ".env"
