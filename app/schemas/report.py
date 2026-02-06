@@ -1,10 +1,15 @@
-﻿from typing import List
+﻿from typing import List, Optional
 from pydantic import BaseModel
 
 
 class AnswerTime(BaseModel):
     question_id: str
+    question_text: str
     answer_seconds: float
+    words_per_min: float
+    transcript: Optional[str] = None
+    model_answer: Optional[str] = None
+    feedback: Optional[str] = None
 
 
 class ReportSummary(BaseModel):
@@ -12,6 +17,8 @@ class ReportSummary(BaseModel):
     min_seconds: float
     max_seconds: float
     std_dev_seconds: float
+    average_wpm: float
+    summary_lines: List[str]
 
 
 class ReportResponse(BaseModel):

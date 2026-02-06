@@ -1,7 +1,10 @@
-﻿from fastapi import APIRouter, HTTPException
-from app.schemas.question import QuestionNextRequest, QuestionOut, AnswerSubmitRequest
+﻿from typing import Optional
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+
+from app.schemas.question import QuestionNextRequest, QuestionOut, AnswerSubmitRequest, AnswerAudioResponse
 from app.core.session_store import session_store
 from app.services.timing_analyzer import record_answer_time
+from app.core.config import settings
 
 router = APIRouter()
 
@@ -31,3 +34,48 @@ def submit_answer(payload: AnswerSubmitRequest):
         answer_seconds=payload.answer_seconds,
     )
     return {"status": "ok"}
+
+
+@router.post("/answer-audio", response_model=AnswerAudioResponse)
+async def submit_answer_audio(
+    session_id: str = Form(...),
+    question_id: str = Form(...),
+    answer_seconds: float = Form(...),
+    audio: UploadFile = File(...),
+):
+    session = session_store.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    transcript = None
+    if settings.openai_api_key:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=settings.openai_api_key)
+        audio.file.seek(0)
+        result = client.audio.transcriptions.create(
+            model=settings.openai_stt_model,
+            file=audio.file,
+            response_format="text",
+        )
+        transcript = str(result).strip() if result else None
+
+    word_count = len(transcript.split()) if transcript else 0
+    wpm = (word_count / (answer_seconds / 60)) if answer_seconds > 0 else 0.0
+
+    session_store.record_answer_for_session(
+        session_id=session_id,
+        question_id=question_id,
+        answer_seconds=answer_seconds,
+        transcript=transcript,
+        word_count=word_count,
+        words_per_min=wpm,
+    )
+
+    return AnswerAudioResponse(
+        session_id=session_id,
+        question_id=question_id,
+        transcript=transcript,
+        answer_seconds=answer_seconds,
+        words_per_min=wpm,
+    )

@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     openai_temperature: float = 0.4
     openai_max_output_tokens: int = 512
+    openai_stt_model: str = "gpt-4o-mini-transcribe"
+    openai_eval_model: Optional[str] = None
 
     class Config:
         env_file = ".env"

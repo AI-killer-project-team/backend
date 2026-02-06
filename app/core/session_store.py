@@ -1,6 +1,17 @@
-﻿import uuid
-from dataclasses import dataclass, field
+﻿from dataclasses import dataclass, field
 from typing import Dict, List, Optional
+import uuid
+
+
+@dataclass
+class AnswerRecord:
+    question_id: str
+    answer_seconds: float
+    transcript: Optional[str] = None
+    word_count: int = 0
+    words_per_min: float = 0.0
+    model_answer: Optional[str] = None
+    feedback: Optional[str] = None
 
 
 @dataclass
@@ -12,7 +23,7 @@ class Session:
     self_intro_text: Optional[str]
     jd_text: Optional[str]
     questions: List[dict]
-    answers: Dict[str, float] = field(default_factory=dict)
+    answers: Dict[str, AnswerRecord] = field(default_factory=dict)
     current_index: int = 0
     ended: bool = False
 
@@ -61,11 +72,25 @@ class SessionStore:
         session.current_index += 1
         return question
 
-    def record_answer(self, session_id: str, question_id: str, answer_seconds: float) -> None:
+    def record_answer_for_session(
+        self,
+        session_id: str,
+        question_id: str,
+        answer_seconds: float,
+        transcript: Optional[str] = None,
+        word_count: int = 0,
+        words_per_min: float = 0.0,
+    ) -> None:
         session = self._sessions.get(session_id)
         if not session:
             return
-        session.answers[question_id] = answer_seconds
+        session.answers[question_id] = AnswerRecord(
+            question_id=question_id,
+            answer_seconds=answer_seconds,
+            transcript=transcript,
+            word_count=word_count,
+            words_per_min=words_per_min,
+        )
 
 
 session_store = SessionStore()

@@ -1,20 +1,9 @@
 ﻿import json
 import uuid
-from pathlib import Path
 from typing import List, Optional
 
 from app.core.config import settings
-
-_DATA_PATH = Path(__file__).resolve().parents[1] / "data" / "companies.json"
-
-
-def _load_company(company_id: str) -> dict:
-    if not _DATA_PATH.exists():
-        return {}
-    data = json.loads(_DATA_PATH.read_text(encoding="utf-8"))
-    if data.get("company_id") == company_id:
-        return data
-    return {}
+from app.services.company_data import load_company
 
 
 def _next_id() -> str:
@@ -52,7 +41,7 @@ def _generate_questions_rule_based(
     jd_text: Optional[str],
     count: int,
 ) -> List[dict]:
-    company = _load_company(company_id)
+    company = load_company(company_id)
     job = None
     for item in company.get("jobs", []):
         if item.get("job_id") == job_id:
@@ -112,7 +101,7 @@ def _generate_questions_llm(
 ) -> List[dict]:
     from openai import OpenAI
 
-    company = _load_company(company_id)
+    company = load_company(company_id)
     job = None
     for item in company.get("jobs", []):
         if item.get("job_id") == job_id:
@@ -172,9 +161,14 @@ def _generate_questions_llm(
         max_output_tokens=settings.openai_max_output_tokens,
     )
 
-    text = getattr(response, "output_text", None)
-    if text is None and getattr(response, "output", None):
-        text = response.output[0].content[0].text
+    text = None
+    if hasattr(response, "output_text"):
+        text = response.output_text
+    if not text and getattr(response, "output", None):
+        try:
+            text = response.output[0].content[0].text
+        except Exception:
+            text = None
 
     questions = _parse_questions(text or "")
 
