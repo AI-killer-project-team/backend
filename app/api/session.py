@@ -1,4 +1,6 @@
-﻿from fastapi import APIRouter, HTTPException, UploadFile, File
+﻿from pathlib import Path
+
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from app.schemas.session import SessionStartRequest, SessionStartResponse, SessionEndRequest, DocParseResponse
 from app.schemas.question import QuestionOut
 from app.core.session_store import session_store
@@ -8,6 +10,9 @@ from app.core.config import settings
 from app.services.doc_parser import extract_text_from_upload
 
 router = APIRouter()
+
+_LOG_DIR = Path(__file__).resolve().parents[1] / "logs"
+_LOG_FILE = _LOG_DIR / "questions.log"
 
 
 @router.post("/start", response_model=SessionStartResponse)
@@ -59,6 +64,16 @@ def start_session(payload: SessionStartRequest):
         "jd_len=",
         len(payload.jd_text or ""),
     )
+    try:
+        _LOG_DIR.mkdir(parents=True, exist_ok=True)
+        _LOG_FILE.open("a", encoding="utf-8").write(
+            f"[session_start] session_id={session.session_id} count={len(questions)} style={payload.style}\n"
+        )
+        _LOG_FILE.open("a", encoding="utf-8").write(
+            f"[session_questions] session_id={session.session_id} questions={ [q['text'] for q in questions] }\n"
+        )
+    except Exception:
+        pass
 
     first_question = session_store.get_next_question(session.session_id)
     if not first_question:

@@ -102,6 +102,80 @@ def generate_question_feedback(
     }
 
 
+def generate_model_answer(
+    company_id: str,
+    job_id: str,
+    question_text: str,
+) -> str:
+    from openai import OpenAI
+
+    company = load_company(company_id)
+    job = None
+    for item in company.get("jobs", []):
+        if item.get("job_id") == job_id:
+            job = item
+            break
+
+    prompt = {
+        "company": {
+            "name": company.get("name"),
+            "summary": company.get("company_summary"),
+            "talent_profile": company.get("talent_profile"),
+            "culture_fit": company.get("culture_fit"),
+        },
+        "job": {
+            "id": job_id,
+            "title": job.get("title") if job else None,
+            "focus_points": job.get("focus_points", []) if job else [],
+        },
+        "question": question_text,
+        "constraints": {
+            "language": "ko",
+            "output_format": "JSON",
+            "schema": {
+                "model_answer": "string (3-5 sentences, structured and concise)",
+            },
+        },
+    }
+
+    system_text = (
+        "You are an expert interview coach. "
+        "Generate a concise model answer (3-5 sentences) that aligns with the company context and job focus points. "
+        "All output content must be in Korean. "
+        "Return ONLY a JSON object with key 'model_answer'. "
+        "Do not include any extra text, markdown, or code blocks."
+    )
+
+    user_text = (
+        "Provide a strong model answer for the question below, aligned to company culture and job focus. "
+        "Output must be ONLY a JSON object.\n"
+        f"Context: {json.dumps(prompt, ensure_ascii=False)}"
+    )
+
+    client = OpenAI(api_key=settings.openai_api_key)
+    response = client.responses.create(
+        model=settings.openai_eval_model or settings.openai_model,
+        input=[
+            {"role": "system", "content": system_text},
+            {"role": "user", "content": user_text},
+        ],
+        temperature=0.3,
+        max_output_tokens=260,
+    )
+
+    text = None
+    if hasattr(response, "output_text"):
+        text = response.output_text
+    if not text and getattr(response, "output", None):
+        try:
+            text = response.output[0].content[0].text
+        except Exception:
+            text = None
+
+    data = _safe_json_loads(text or "")
+    return data.get("model_answer") or ""
+
+
 def generate_summary_lines(
     summary: dict,
     answers: List[AnswerRecord],

@@ -2,7 +2,11 @@
 
 from app.schemas.report import ReportResponse, ReportSummary, AnswerTime
 from app.utils.stats import average, std_dev
-from app.services.feedback_generator import generate_question_feedback, generate_summary_lines
+from app.services.feedback_generator import (
+    generate_model_answer,
+    generate_question_feedback,
+    generate_summary_lines,
+)
 from app.core.config import settings
 
 
@@ -66,6 +70,16 @@ def build_report(session) -> ReportResponse:
 
     for record in answers:
         question_text = question_text_map.get(record.question_id, "")
+
+        if settings.openai_api_key and not record.model_answer:
+            try:
+                record.model_answer = generate_model_answer(
+                    company_id=session.company_id,
+                    job_id=session.job_id,
+                    question_text=question_text,
+                )
+            except Exception:
+                pass
 
         if settings.openai_api_key and record.transcript and not record.feedback:
             try:
