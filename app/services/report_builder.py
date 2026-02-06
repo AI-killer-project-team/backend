@@ -68,11 +68,20 @@ def build_report(session) -> ReportResponse:
             return True
         if re.search(r"(.)\1{5,}", stripped):
             return True
-        unique_ratio = len(set(stripped)) / max(len(stripped), 1)
-        if unique_ratio < 0.2:
+        # filler checks
+        fillers = ["어쩌고", "저쩌고", "그냥", "음", "어", "아", "뭐", "몰라"]
+        if any(f * 2 in stripped for f in fillers):
             return True
-        letters = re.findall(r"[A-Za-z가-힣]", stripped)
-        if len(letters) < 10:
+        # token variety check
+        tokens = re.findall(r"[A-Za-z가-힣]+", stripped)
+        if len(tokens) < 6:
+            return True
+        unique_ratio = len(set(tokens)) / max(len(tokens), 1)
+        if unique_ratio < 0.5:
+            return True
+        # character variety
+        char_ratio = len(set(stripped)) / max(len(stripped), 1)
+        if char_ratio < 0.2:
             return True
         return False
 
@@ -89,8 +98,8 @@ def build_report(session) -> ReportResponse:
 
     if not summary_lines:
         summary_lines = [
-            "일부 답변이 면접 질문과 무관하거나 내용이 불분명했습니다.",
-            "의미 있는 사례, 역할, 결과를 포함해 답변의 정보량을 늘려보세요.",
+            "답변 중 상당수가 질문과 무관하거나 내용이 불분명했습니다.",
+            "구체적인 역할·행동·결과를 포함해 답변의 정보량을 늘려보세요.",
             "다음 인터뷰에서는 질문 의도를 먼저 정리한 뒤 핵심 근거로 답변해 주세요.",
         ]
         session.summary_lines = summary_lines
@@ -112,7 +121,7 @@ def build_report(session) -> ReportResponse:
 
         unreliable = is_unreliable_transcript(record.transcript or "")
         if unreliable and not record.feedback:
-            record.feedback = "답변 인식이 불충분해 피드백을 생성하지 못했습니다. 조용한 환경에서 다시 답변해 주세요."
+            record.feedback = "면접과 무관하거나 의미가 불명확한 답변으로 판단됩니다. 질문 의도에 맞게 구체적으로 답변해 주세요."
 
         if settings.openai_api_key and record.transcript and not record.feedback and not unreliable:
             try:
