@@ -44,6 +44,21 @@ def start_session(payload: SessionStartRequest):
         tts_speed=payload.tts_speed,
         questions=questions,
     )
+    print(
+        "[session_start]",
+        "session_id=",
+        session.session_id,
+        "count=",
+        len(questions),
+        "style=",
+        payload.style,
+        "resume_len=",
+        len(payload.resume_text or ""),
+        "self_intro_len=",
+        len(payload.self_intro_text or ""),
+        "jd_len=",
+        len(payload.jd_text or ""),
+    )
 
     first_question = session_store.get_next_question(session.session_id)
     if not first_question:

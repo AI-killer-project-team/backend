@@ -8,6 +8,15 @@ from app.core.config import settings
 
 def build_report(session) -> ReportResponse:
     question_text_map = {q["question_id"]: q["text"] for q in session.questions}
+    print(
+        "[report_builder]",
+        "session_id=",
+        session.session_id,
+        "total_questions=",
+        len(session.questions),
+        "answered=",
+        len(session.answers),
+    )
     ordered_records = [
         session.answers[qid]
         for qid in question_text_map.keys()

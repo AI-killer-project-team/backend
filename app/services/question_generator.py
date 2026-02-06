@@ -32,10 +32,22 @@ def _clip(text: Optional[str], limit: int = 2000) -> Optional[str]:
 
 
 def _parse_questions(text: str) -> List[str]:
+    if not text:
+        return []
     try:
         data = json.loads(text)
     except Exception:
-        return []
+        data = None
+
+    if data is None:
+        # Try to extract JSON array substring
+        start = text.find("[")
+        end = text.rfind("]")
+        if start != -1 and end != -1 and end > start:
+            try:
+                data = json.loads(text[start:end + 1])
+            except Exception:
+                data = None
 
     if isinstance(data, list):
         return [str(item).strip() for item in data if str(item).strip()]
@@ -45,7 +57,15 @@ def _parse_questions(text: str) -> List[str]:
         if isinstance(items, list):
             return [str(item).strip() for item in items if str(item).strip()]
 
-    return []
+    # Fallback: parse numbered/bulleted lines
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    parsed: List[str] = []
+    for line in lines:
+        line = re.sub(r"^\d+\.\s*", "", line)
+        line = re.sub(r"^[-*]\s*", "", line)
+        if line:
+            parsed.append(line)
+    return parsed
 
 
 def _log_text(label: str, text: Optional[str]) -> None:
@@ -60,6 +80,13 @@ def _log_text(label: str, text: Optional[str]) -> None:
         _LOG_FILE.open("a", encoding="utf-8").write(f"[question_generator] {label}={safe}\n")
     except Exception:
         pass
+
+
+def _log_list(label: str, items: List[str]) -> None:
+    if not items:
+        return
+    payload = json.dumps(items, ensure_ascii=False)
+    _log_text(label, payload)
 
 
 def _normalize_question(text: str) -> str:
@@ -414,7 +441,7 @@ def _generate_questions_llm(
     questions = _dedupe_similar(questions)
     questions = _sanitize_tone(questions, style)
     _log_text("llm_raw", text)
-    _log_text("llm_questions", json.dumps(questions, ensure_ascii=False))
+    _log_list("llm_questions", questions)
 
     if not questions or "자기소개" not in questions[0]:
         if style == "pressure":
