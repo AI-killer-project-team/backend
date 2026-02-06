@@ -133,7 +133,7 @@ def _generate_questions_rule_based(
         deduped.append(q)
     questions = deduped[:count]
 
-    return [
+    result = [
         {
             "question_id": _next_id(),
             "text": text,
@@ -141,6 +141,8 @@ def _generate_questions_rule_based(
         }
         for text in questions
     ]
+    print("[question_generator] questions=", [q["text"] for q in result])
+    return result
 
 
 def _generate_questions_llm(
