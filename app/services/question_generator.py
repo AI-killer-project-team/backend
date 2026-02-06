@@ -8,6 +8,8 @@ from app.core.config import settings
 from app.services.company_data import load_company
 
 _DATA_PATH = Path(__file__).resolve().parents[1] / "data" / "companies.json"
+_LOG_DIR = Path(__file__).resolve().parents[1] / "logs"
+_LOG_FILE = _LOG_DIR / "questions.log"
 
 
 def _load_company(company_id: str) -> dict:
@@ -46,6 +48,20 @@ def _parse_questions(text: str) -> List[str]:
     return []
 
 
+def _log_text(label: str, text: Optional[str]) -> None:
+    if not text:
+        return
+    safe = text.replace("\n", " ").strip()
+    if len(safe) > 500:
+        safe = safe[:500] + "..."
+    print(f"[question_generator] {label}={safe}")
+    try:
+        _LOG_DIR.mkdir(parents=True, exist_ok=True)
+        _LOG_FILE.open("a", encoding="utf-8").write(f"[question_generator] {label}={safe}\n")
+    except Exception:
+        pass
+
+
 def _normalize_question(text: str) -> str:
     text = text.lower()
     text = re.sub(r"[^\w\s]", "", text)
@@ -81,6 +97,55 @@ def _append_unique(base: List[str], candidates: List[str], threshold: float = 0.
             continue
         result.append(c)
     return result
+
+
+def _extract_highlights(text: Optional[str], limit: int = 6) -> List[str]:
+    if not text:
+        return []
+    keywords = [
+        "프로젝트",
+        "서비스",
+        "개발",
+        "개선",
+        "성과",
+        "지표",
+        "매출",
+        "사용자",
+        "트래픽",
+        "속도",
+        "성능",
+        "리팩터링",
+        "배포",
+        "테스트",
+        "운영",
+        "자동화",
+        "리딩",
+        "협업",
+        "문제",
+        "해결",
+        "기술",
+        "React",
+        "TypeScript",
+        "JavaScript",
+        "Next",
+        "Vue",
+        "Node",
+        "API",
+        "DB",
+        "SQL",
+    ]
+    sentences = re.split(r"[.\n!?]+", text)
+    candidates: List[str] = []
+    for raw in sentences:
+        s = raw.strip()
+        if len(s) < 15 or len(s) > 160:
+            continue
+        if any(ch.isdigit() for ch in s) or any(k.lower() in s.lower() for k in keywords):
+            candidates.append(s)
+    # fallback: take non-empty lines
+    if not candidates:
+        candidates = [line.strip() for line in text.splitlines() if 15 <= len(line.strip()) <= 160]
+    return candidates[:limit]
 
 
 def _sanitize_tone(questions: List[str], style: Optional[str]) -> List[str]:
@@ -141,6 +206,16 @@ def _generate_questions_rule_based(
         questions.append(f"{company_name} {job_title}에 지원한 이유를 말씀해 주세요.")
 
     if resume_text or self_intro_text:
+        highlights = _extract_highlights(f"{resume_text or ''}\n{self_intro_text or ''}")
+        for h in highlights[:2]:
+            snippet = h[:60]
+            if style == "pressure":
+                questions.append(f"지원서에 '{snippet}'라고 적었습니다. 본인 역할과 성과를 핵심만 말해 주세요.")
+            elif style == "friendly":
+                questions.append(f"지원서에 '{snippet}'라고 적은 내용을 조금 더 자세히 설명해 주세요.")
+            else:
+                questions.append(f"지원서에 '{snippet}'라고 적은 부분에서 본인 역할과 결과를 구체적으로 설명해 주세요.")
+
         if style == "pressure":
             questions.append("이력서/자소서에서 강점이 드러나는 경험 하나를 핵심만 설명해 주세요.")
         elif style == "friendly":
@@ -149,6 +224,16 @@ def _generate_questions_rule_based(
             questions.append("이력서/자소서에서 가장 강점을 보여주는 경험 하나를 설명해 주세요.")
 
     if jd_text:
+        jd_highlights = _extract_highlights(jd_text, limit=3)
+        for h in jd_highlights[:1]:
+            snippet = h[:60]
+            if style == "pressure":
+                questions.append(f"공고에 '{snippet}'가 있습니다. 관련 경험을 증거와 함께 말해 주세요.")
+            elif style == "friendly":
+                questions.append(f"공고에 '{snippet}'가 있는데, 관련 경험이 있다면 편하게 설명해 주세요.")
+            else:
+                questions.append(f"공고에 '{snippet}'가 있는데, 해당 요구사항과 연결되는 경험을 설명해 주세요.")
+
         if style == "pressure":
             questions.append("채용 공고 요구사항 중 가장 잘 맞는 부분을 근거와 함께 짧게 말해 주세요.")
         elif style == "friendly":
@@ -228,6 +313,8 @@ def _generate_questions_llm(
     company_name = company.get("name", "회사")
     job_title = job.get("title", "직무") if job else "직무"
     focus_points = job.get("focus_points", []) if job else []
+    resume_highlights = _extract_highlights(f"{resume_text or ''}\n{self_intro_text or ''}")
+    jd_highlights = _extract_highlights(jd_text, limit=3)
 
     prompt = {
         "company": {
@@ -241,6 +328,8 @@ def _generate_questions_llm(
             "title": job_title,
             "focus_points": focus_points,
         },
+        "candidate_highlights": resume_highlights,
+        "jd_highlights": jd_highlights,
         "interview_style": style or "neutral",
         "candidate": {
             "resume_text": _clip(resume_text),
@@ -273,7 +362,7 @@ def _generate_questions_llm(
         },
         "quality_rules": [
             "Avoid repeating similar questions.",
-            "Use resume/self_intro content to create at least one personalized question.",
+            "Use resume/self_intro content to create at least two personalized questions.",
             "If resume/self_intro is empty, skip personalization."
         ],
     }
@@ -286,7 +375,8 @@ def _generate_questions_llm(
         "pressure 스타일일 때는 친절한 표현(편하게, 부담 없이, 자유롭게 등)을 사용하지 마세요. "
         "모든 질문은 1~2문장, 100자 이내로 작성하세요. "
         "민감/차별 가능 주제(정치, 종교, 가족/출신, 건강/질병, 나이/성별, 혼인/임신, 국적/인종)는 제외하세요. "
-        "resume_text 또는 self_intro_text가 있으면 반드시 그 내용에서 2개 이상 개인화 질문을 만드세요. "
+        "candidate_highlights 또는 resume_text/self_intro_text가 있으면 반드시 그 내용에서 2개 이상 개인화 질문을 만드세요. "
+        "질문은 일반적인 표현을 피하고, 지원서의 구체적 내용(프로젝트명, 역할, 수치, 기술)을 직접 언급하세요. "
         "질문은 서로 중복되거나 유사하지 않도록 하세요. "
         "출력은 반드시 JSON 문자열 배열만 반환하세요. "
         "첫 질문은 반드시 자기소개 질문이어야 하며, 스타일 톤을 반영하세요."
@@ -322,6 +412,9 @@ def _generate_questions_llm(
 
     questions = _parse_questions(text or "")
     questions = _dedupe_similar(questions)
+    questions = _sanitize_tone(questions, style)
+    _log_text("llm_raw", text)
+    _log_text("llm_questions", json.dumps(questions, ensure_ascii=False))
 
     if not questions or "자기소개" not in questions[0]:
         if style == "pressure":
