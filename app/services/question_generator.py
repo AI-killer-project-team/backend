@@ -83,6 +83,27 @@ def _append_unique(base: List[str], candidates: List[str], threshold: float = 0.
     return result
 
 
+def _sanitize_tone(questions: List[str], style: Optional[str]) -> List[str]:
+    if style != "pressure":
+        return questions
+    replacements = {
+        "편하게": "핵심만",
+        "편안하게": "핵심만",
+        "부담 없이": "간단히",
+        "자유롭게": "간단히",
+        "천천히": "간단히",
+        "말씀해 주세요": "말해 주세요",
+        "부탁드립니다": "말해 주세요",
+    }
+    cleaned: List[str] = []
+    for q in questions:
+        out = q
+        for src, dst in replacements.items():
+            out = out.replace(src, dst)
+        cleaned.append(out)
+    return cleaned
+
+
 def _generate_questions_rule_based(
     company_id: str,
     job_id: str,
@@ -172,6 +193,7 @@ def _generate_questions_rule_based(
         questions = _append_unique(questions, fallback)
 
     questions = questions[:count]
+    questions = _sanitize_tone(questions, style)
 
     result = [
         {
@@ -244,6 +266,7 @@ def _generate_questions_llm(
         },
         "style_guidance": {
             "pressure": [
+                "Use a direct and strict tone. Do not use friendly phrases like '편하게', '부담 없이', '자유롭게'.",
                 "Include at least one question asking for evidence or metrics.",
                 "Include at least one question probing risks or trade-offs."
             ]
@@ -260,6 +283,7 @@ def _generate_questions_llm(
         "목표는 '지원자의 자소서/이력서에서 궁금한 점을 파고드는 질문'을 만드는 것입니다. "
         "회사/직무/인재상/컬처핏/직무 포인트를 반영하세요. "
         "interview_style에 맞게 문장 톤을 조정하세요 (friendly/pressure/neutral). "
+        "pressure 스타일일 때는 친절한 표현(편하게, 부담 없이, 자유롭게 등)을 사용하지 마세요. "
         "모든 질문은 1~2문장, 100자 이내로 작성하세요. "
         "민감/차별 가능 주제(정치, 종교, 가족/출신, 건강/질병, 나이/성별, 혼인/임신, 국적/인종)는 제외하세요. "
         "resume_text 또는 self_intro_text가 있으면 반드시 그 내용에서 2개 이상 개인화 질문을 만드세요. "
