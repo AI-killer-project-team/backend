@@ -106,12 +106,28 @@ def _is_similar(a: str, b: str, threshold: float = 0.85) -> bool:
     return SequenceMatcher(None, na, nb).ratio() >= threshold
 
 
-def _dedupe_similar(questions: List[str], threshold: float = 0.85) -> List[str]:
+def _dedupe_similar(questions: List[str], threshold: float = 0.8) -> List[str]:
     result: List[str] = []
     for q in questions:
         if not q or not q.strip():
             continue
         if any(_is_similar(q, exist, threshold) for exist in result):
+            continue
+        result.append(q)
+    return result
+
+
+def _remove_duplicate_self_intro(questions: List[str]) -> List[str]:
+    if not questions:
+        return questions
+    result: List[str] = []
+    first_kept = False
+    for q in questions:
+        is_self_intro = "자기소개" in q or "본인" in q and "소개" in q
+        if is_self_intro:
+            if not first_kept:
+                result.append(q)
+                first_kept = True
             continue
         result.append(q)
     return result
@@ -294,6 +310,7 @@ def _generate_questions_rule_based(
             questions.append("가장 어려웠던 상황과 해결 과정을 설명해 주세요.")
 
     questions = _dedupe_similar(questions)
+    questions = _remove_duplicate_self_intro(questions)
 
     if len(questions) < count:
         fallback = [
@@ -439,6 +456,7 @@ def _generate_questions_llm(
 
     questions = _parse_questions(text or "")
     questions = _dedupe_similar(questions)
+    questions = _remove_duplicate_self_intro(questions)
     questions = _sanitize_tone(questions, style)
     _log_text("llm_raw", text)
     _log_list("llm_questions", questions)
