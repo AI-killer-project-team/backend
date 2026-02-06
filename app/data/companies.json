@@ -1,0 +1,32 @@
+﻿{
+  "company_id": "toss",
+  "name": "TOSS",
+  "company_summary": "금융 플랫폼 기반의 핀테크 서비스 기업",
+  "talent_profile": [
+    "문제 해결에 집요함",
+    "고객 중심 사고",
+    "빠른 실행"
+  ],
+  "culture_fit": [
+    "수평적 커뮤니케이션",
+    "자율과 책임",
+    "실험과 개선"
+  ],
+  "jobs": [
+    {
+      "job_id": "frontend",
+      "title": "Frontend Developer",
+      "active": true
+    },
+    {
+      "job_id": "po",
+      "title": "PO",
+      "active": false
+    },
+    {
+      "job_id": "server",
+      "title": "Server Developer",
+      "active": false
+    }
+  ]
+}
