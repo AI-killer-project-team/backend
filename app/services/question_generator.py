@@ -1,5 +1,6 @@
 ﻿import json
 import uuid
+import re
 from pathlib import Path
 from typing import List, Optional
 
@@ -43,6 +44,43 @@ def _parse_questions(text: str) -> List[str]:
             return [str(item).strip() for item in items if str(item).strip()]
 
     return []
+
+
+def _normalize_question(text: str) -> str:
+    text = text.lower()
+    text = re.sub(r"[^\w\s]", "", text)
+    text = re.sub(r"\s+", "", text)
+    return text
+
+
+def _is_similar(a: str, b: str, threshold: float = 0.85) -> bool:
+    from difflib import SequenceMatcher
+
+    na = _normalize_question(a)
+    nb = _normalize_question(b)
+    if not na or not nb:
+        return False
+    return SequenceMatcher(None, na, nb).ratio() >= threshold
+
+
+def _dedupe_similar(questions: List[str], threshold: float = 0.85) -> List[str]:
+    result: List[str] = []
+    for q in questions:
+        if not q or not q.strip():
+            continue
+        if any(_is_similar(q, exist, threshold) for exist in result):
+            continue
+        result.append(q)
+    return result
+
+
+def _append_unique(base: List[str], candidates: List[str], threshold: float = 0.85) -> List[str]:
+    result = base[:]
+    for c in candidates:
+        if any(_is_similar(c, exist, threshold) for exist in result):
+            continue
+        result.append(c)
+    return result
 
 
 def _generate_questions_rule_based(
@@ -122,16 +160,18 @@ def _generate_questions_rule_based(
         else:
             questions.append("가장 어려웠던 상황과 해결 과정을 설명해 주세요.")
 
-    # de-duplicate while preserving order
-    seen = set()
-    deduped: List[str] = []
-    for q in questions:
-        key = q.strip().lower()
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        deduped.append(q)
-    questions = deduped[:count]
+    questions = _dedupe_similar(questions)
+
+    if len(questions) < count:
+        fallback = [
+            "팀에서 의견 충돌이 있었을 때 어떻게 조율했나요?",
+            "최근 개선한 기능이나 프로세스를 설명해 주세요.",
+            "가장 큰 실수에서 무엇을 배웠나요?",
+            "업무 우선순위를 어떻게 정하나요?",
+        ]
+        questions = _append_unique(questions, fallback)
+
+    questions = questions[:count]
 
     result = [
         {
@@ -257,16 +297,7 @@ def _generate_questions_llm(
             text = None
 
     questions = _parse_questions(text or "")
-    # de-duplicate while preserving order
-    seen = set()
-    deduped: List[str] = []
-    for q in questions:
-        key = q.strip().lower()
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        deduped.append(q)
-    questions = deduped
+    questions = _dedupe_similar(questions)
 
     if not questions or "자기소개" not in questions[0]:
         if style == "pressure":
@@ -277,13 +308,14 @@ def _generate_questions_llm(
             first = "간단히 자기소개 해주세요."
         questions = [first] + [q for q in questions if q]
 
-    while len(questions) < count:
-        if style == "pressure":
-            questions.append("가장 어려웠던 상황과 해결 과정을 핵심만 말해 주세요.")
-        elif style == "friendly":
-            questions.append("가장 어려웠던 상황과 해결 과정을 편하게 설명해 주세요.")
-        else:
-            questions.append("가장 어려웠던 상황과 해결 과정을 설명해 주세요.")
+    if len(questions) < count:
+        fallback = [
+            "팀에서 의견 충돌이 있었을 때 어떻게 조율했나요?",
+            "최근 개선한 기능이나 프로세스를 설명해 주세요.",
+            "가장 큰 실수에서 무엇을 배웠나요?",
+            "업무 우선순위를 어떻게 정하나요?",
+        ]
+        questions = _append_unique(questions, fallback)
 
     questions = questions[:count]
 
