@@ -1,9 +1,21 @@
 ﻿import json
 import uuid
+from pathlib import Path
 from typing import List, Optional
 
 from app.core.config import settings
 from app.services.company_data import load_company
+
+_DATA_PATH = Path(__file__).resolve().parents[1] / "data" / "companies.json"
+
+
+def _load_company(company_id: str) -> dict:
+    if not _DATA_PATH.exists():
+        return {}
+    data = json.loads(_DATA_PATH.read_text(encoding="utf-8"))
+    if data.get("company_id") == company_id:
+        return data
+    return {}
 
 
 def _next_id() -> str:
@@ -86,6 +98,10 @@ def _generate_questions_rule_based(
             questions.append("채용 공고 요구사항 중 가장 잘 맞는 부분과 이유를 말씀해 주세요.")
 
     focus_points = job.get("focus_points", []) if job else []
+    if focus_points:
+        focus_points = focus_points[:]
+        import random
+        random.shuffle(focus_points)
     for point in focus_points:
         if style == "pressure":
             questions.append(f"{point} 관련 경험을 핵심만 말해 주세요.")
@@ -106,7 +122,16 @@ def _generate_questions_rule_based(
         else:
             questions.append("가장 어려웠던 상황과 해결 과정을 설명해 주세요.")
 
-    questions = questions[:count]
+    # de-duplicate while preserving order
+    seen = set()
+    deduped: List[str] = []
+    for q in questions:
+        key = q.strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        deduped.append(q)
+    questions = deduped[:count]
 
     return [
         {
@@ -181,21 +206,31 @@ def _generate_questions_llm(
                 "Include at least one question probing risks or trade-offs."
             ]
         },
+        "quality_rules": [
+            "Avoid repeating similar questions.",
+            "Use resume/self_intro content to create at least one personalized question.",
+            "If resume/self_intro is empty, skip personalization."
+        ],
     }
 
     system_text = (
         "당신은 면접 질문을 생성하는 코치입니다. "
-        "한국어로 간결하고 현실적인 질문을 만들어 주세요. "
+        "목표는 '지원자의 자소서/이력서에서 궁금한 점을 파고드는 질문'을 만드는 것입니다. "
+        "회사/직무/인재상/컬처핏/직무 포인트를 반영하세요. "
         "interview_style에 맞게 문장 톤을 조정하세요 (friendly/pressure/neutral). "
-        "모든 질문은 1~3문장, 100자 이내로 작성하세요. "
+        "모든 질문은 1~2문장, 100자 이내로 작성하세요. "
         "민감/차별 가능 주제(정치, 종교, 가족/출신, 건강/질병, 나이/성별, 혼인/임신, 국적/인종)는 제외하세요. "
+        "resume_text 또는 self_intro_text가 있으면 반드시 그 내용에서 2개 이상 개인화 질문을 만드세요. "
+        "질문은 서로 중복되거나 유사하지 않도록 하세요. "
         "출력은 반드시 JSON 문자열 배열만 반환하세요. "
         "첫 질문은 반드시 자기소개 질문이어야 하며, 스타일 톤을 반영하세요."
     )
 
     user_text = (
         "아래 컨텍스트를 바탕으로 질문을 생성해 주세요. "
-        "회사/직무/지원자 맥락에 맞게 질문을 구성하고 중복은 피하세요.\n"
+        "지원자의 자소서/이력서에서 구체적 성과, 역할, 선택 이유, 문제 해결 방식에 대해 깊게 묻는 질문을 포함하세요. "
+        "회사 인재상/컬처핏/직무 포인트와 연결되는 질문을 포함하세요. "
+        "중복은 피하세요.\n"
         f"컨텍스트: {json.dumps(prompt, ensure_ascii=False)}"
     )
 
@@ -220,10 +255,20 @@ def _generate_questions_llm(
             text = None
 
     questions = _parse_questions(text or "")
+    # de-duplicate while preserving order
+    seen = set()
+    deduped: List[str] = []
+    for q in questions:
+        key = q.strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        deduped.append(q)
+    questions = deduped
 
     if not questions or "자기소개" not in questions[0]:
         if style == "pressure":
-            first = "자기소개 해 주세요."
+            first = "자기소개를 1분 내로 핵심만 말해 주세요."
         elif style == "friendly":
             first = "편하게 자기소개 부탁드립니다."
         else:
@@ -260,6 +305,18 @@ def generate_questions(
     style: Optional[str] = None,
 ) -> List[dict]:
     count = max(1, count)
+    print(
+        "[question_generator] resume_len=",
+        len(resume_text or ""),
+        "self_intro_len=",
+        len(self_intro_text or ""),
+        "jd_len=",
+        len(jd_text or ""),
+        "style=",
+        style,
+        "use_llm=",
+        bool(settings.openai_api_key),
+    )
 
     if settings.openai_api_key:
         try:
