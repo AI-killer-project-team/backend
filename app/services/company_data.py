@@ -11,3 +11,10 @@ def load_company(company_id: str) -> dict:
     if data.get("company_id") == company_id:
         return data
     return {}
+
+
+def find_job(company: dict, job_id: str) -> dict:
+    for item in company.get("jobs", []):
+        if item.get("job_id") == job_id:
+            return item
+    return {}

@@ -27,6 +27,11 @@ def submit_answer(payload: AnswerSubmitRequest):
     session = session_store.get_session(payload.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    question_ids = {q["question_id"] for q in session.questions}
+    if payload.question_id not in question_ids:
+        raise HTTPException(status_code=404, detail="Question not found")
+    if payload.answer_seconds < 0 or payload.answer_seconds > settings.time_limit_seconds:
+        raise HTTPException(status_code=400, detail="answer_seconds out of range")
 
     record_answer_time(
         session_id=payload.session_id,
@@ -46,6 +51,11 @@ async def submit_answer_audio(
     session = session_store.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    question_ids = {q["question_id"] for q in session.questions}
+    if question_id not in question_ids:
+        raise HTTPException(status_code=404, detail="Question not found")
+    if answer_seconds < 0 or answer_seconds > settings.time_limit_seconds:
+        raise HTTPException(status_code=400, detail="answer_seconds out of range")
 
     transcript = None
     if settings.openai_api_key:
