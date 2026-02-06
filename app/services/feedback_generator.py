@@ -1,17 +1,23 @@
-﻿import json
+import json
+import logging
+
 from typing import List
 
 from app.core.config import settings
 from app.core.session_store import AnswerRecord
 from app.services.company_data import load_company
 
+logger = logging.getLogger(__name__)
 
 def _safe_json_loads(text: str) -> dict:
     try:
         return json.loads(text)
-    except Exception:
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse JSON: {text[:100]}... Error: {e}")
         return {}
-
+    except Exception as e:
+        logger.error(f"An unexpected error occured during JSON parsing: {e}")
+        return {}
 
 def generate_question_feedback(
     company_id: str,
@@ -53,12 +59,19 @@ def generate_question_feedback(
     }
 
     system_text = (
-        "You are an interview coach. "
-        "Provide a short model answer structure and a one-sentence feedback. "
-        "Return ONLY JSON with keys: model_answer, feedback."
+        "You are an expert interview coach. "
+        "Your task is to provide constructive feedback for a candidate's interview answer. "
+        "First, generate a concise model answer structure (3-5 sentences, focusing on key points). "
+        "Second, provide a single, actionable sentence of feedback that highlights one strength and one area for improvement. "
+        "All output content in the JSON, specifically the 'model_answer' and 'feedback' values, must be in Korean. "
+        "Return ONLY a JSON object with keys: 'model_answer' and 'feedback'."
     )
 
-    user_text = f"Context: {json.dumps(prompt, ensure_ascii=False)}"
+    user_text = (
+        "Analyze the candidate's answer to the following question, considering the company's talent profile and culture fit, "
+        "and the job's key focus points. Provide a model answer that aligns with these contexts and feedback that helps the candidate improve.\n"
+        f"Context: {json.dumps(prompt, ensure_ascii=False)}"
+    )
 
     client = OpenAI(api_key=settings.openai_api_key)
     response = client.responses.create(
@@ -112,8 +125,10 @@ def generate_summary_lines(
     }
 
     system_text = (
-        "You are an interview coach. "
-        "Summarize in exactly 3 concise lines. "
+        "You are an expert interview coach. "
+        "Summarize the candidate's overall interview performance in exactly three concise lines. "
+        "Each line should cover a distinct aspect: 1) overall strengths, 2) key areas for improvement, and 3) one actionable tip for the next interview. "
+        "All strings in the output JSON array must be in Korean. "
         "Return ONLY a JSON array of strings."
     )
     user_text = f"Context: {json.dumps(payload, ensure_ascii=False)}"

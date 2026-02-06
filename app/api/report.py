@@ -5,7 +5,6 @@ from app.services.report_builder import build_report
 
 router = APIRouter()
 
-
 @router.get("/{session_id}", response_model=ReportResponse)
 def get_report(session_id: str):
     session = session_store.get_session(session_id)
