@@ -64,12 +64,14 @@ def generate_question_feedback(
         "First, generate a concise model answer structure (3-5 sentences, focusing on key points). "
         "Second, provide a single, actionable sentence of feedback that highlights one strength and one area for improvement. "
         "All output content in the JSON, specifically the 'model_answer' and 'feedback' values, must be in Korean. "
-        "Return ONLY a JSON object with keys: 'model_answer' and 'feedback'."
+        "Return ONLY a JSON object with keys: 'model_answer' and 'feedback'. "
+        "Do not include any extra text, markdown, or code blocks."
     )
 
     user_text = (
         "Analyze the candidate's answer to the following question, considering the company's talent profile and culture fit, "
-        "and the job's key focus points. Provide a model answer that aligns with these contexts and feedback that helps the candidate improve.\n"
+        "and the job's key focus points. Provide a model answer that aligns with these contexts and feedback that helps the candidate improve. "
+        "Output must be ONLY a JSON object, with no extra commentary.\n"
         f"Context: {json.dumps(prompt, ensure_ascii=False)}"
     )
 
@@ -129,7 +131,8 @@ def generate_summary_lines(
         "Summarize the candidate's overall interview performance in exactly three concise lines. "
         "Each line should cover a distinct aspect: 1) overall strengths, 2) key areas for improvement, and 3) one actionable tip for the next interview. "
         "All strings in the output JSON array must be in Korean. "
-        "Return ONLY a JSON array of strings."
+        "Return ONLY a JSON array of strings. "
+        "Do not include any extra text, markdown, or code blocks."
     )
     user_text = f"Context: {json.dumps(payload, ensure_ascii=False)}"
 
