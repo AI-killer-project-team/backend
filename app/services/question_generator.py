@@ -40,6 +40,7 @@ def _generate_questions_rule_based(
     self_intro_text: Optional[str],
     jd_text: Optional[str],
     count: int,
+    style: Optional[str],
 ) -> List[dict]:
     company = load_company(company_id)
     job = None
@@ -54,30 +55,52 @@ def _generate_questions_rule_based(
     job_title = job.get("title", "직무") if job else "직무"
 
     # Q1 is always a self-introduction
-    questions.append("간단히 자기소개 해주세요.")
+    if style == "pressure":
+        questions.append("자기소개를 1분 내로 핵심만 말해 주세요.")
+    elif style == "friendly":
+        questions.append("편하게 자기소개 부탁드립니다.")
+    else:
+        questions.append("간단히 자기소개 해주세요.")
 
-    questions.append(
-        f"{company_name} {job_title}에 지원한 이유를 말씀해 주세요."
-    )
+    if style == "pressure":
+        questions.append(f"{company_name} {job_title}에 지원한 이유를 핵심만 말해 주세요.")
+    elif style == "friendly":
+        questions.append(f"{company_name} {job_title}에 지원한 이유를 편하게 말씀해 주세요.")
+    else:
+        questions.append(f"{company_name} {job_title}에 지원한 이유를 말씀해 주세요.")
 
     if resume_text or self_intro_text:
-        questions.append(
-            "이력서/자소서에서 가장 강점을 보여주는 경험 하나를 설명해 주세요."
-        )
+        if style == "pressure":
+            questions.append("이력서/자소서에서 강점이 드러나는 경험 하나를 핵심만 설명해 주세요.")
+        elif style == "friendly":
+            questions.append("이력서/자소서에서 강점이 드러나는 경험 하나를 편하게 설명해 주세요.")
+        else:
+            questions.append("이력서/자소서에서 가장 강점을 보여주는 경험 하나를 설명해 주세요.")
 
     if jd_text:
-        questions.append(
-            "채용 공고 요구사항 중 가장 잘 맞는 부분과 이유를 말씀해 주세요."
-        )
+        if style == "pressure":
+            questions.append("채용 공고 요구사항 중 가장 잘 맞는 부분을 근거와 함께 짧게 말해 주세요.")
+        elif style == "friendly":
+            questions.append("채용 공고 요구사항 중 가장 잘 맞는 부분과 이유를 편하게 말씀해 주세요.")
+        else:
+            questions.append("채용 공고 요구사항 중 가장 잘 맞는 부분과 이유를 말씀해 주세요.")
 
     focus_points = job.get("focus_points", []) if job else []
     for point in focus_points:
-        questions.append(
-            f"{point}과 관련된 경험을 구체적으로 설명해 주세요."
-        )
+        if style == "pressure":
+            questions.append(f"{point} 관련 경험을 핵심만 말해 주세요.")
+        elif style == "friendly":
+            questions.append(f"{point}과 관련된 경험을 편하게 설명해 주세요.")
+        else:
+            questions.append(f"{point}과 관련된 경험을 구체적으로 설명해 주세요.")
 
     while len(questions) < count:
-        questions.append("가장 어려웠던 상황과 해결 과정을 설명해 주세요.")
+        if style == "pressure":
+            questions.append("가장 어려웠던 상황과 해결 과정을 핵심만 말해 주세요.")
+        elif style == "friendly":
+            questions.append("가장 어려웠던 상황과 해결 과정을 편하게 설명해 주세요.")
+        else:
+            questions.append("가장 어려웠던 상황과 해결 과정을 설명해 주세요.")
 
     questions = questions[:count]
 
@@ -98,6 +121,7 @@ def _generate_questions_llm(
     self_intro_text: Optional[str],
     jd_text: Optional[str],
     count: int,
+    style: Optional[str],
 ) -> List[dict]:
     from openai import OpenAI
 
@@ -124,6 +148,7 @@ def _generate_questions_llm(
             "title": job_title,
             "focus_points": focus_points,
         },
+        "interview_style": style or "neutral",
         "candidate": {
             "resume_text": _clip(resume_text),
             "self_intro_text": _clip(self_intro_text),
@@ -132,16 +157,17 @@ def _generate_questions_llm(
         "constraints": {
             "language": "ko",
             "question_count": count,
-            "first_question_fixed": "간단히 자기소개 해주세요.",
+            "first_question_fixed": "자기소개 질문(스타일에 맞게 말투만 변경 가능)",
             "output_format": "JSON array of strings",
         },
     }
 
     system_text = (
         "You are an interview question generator. "
-        "Generate concise, realistic interview questions. "
+        "Generate concise, realistic interview questions in Korean. "
+        "Adjust the wording to match the interview_style (friendly/pressure/neutral). "
         "Return ONLY a JSON array of strings. "
-        "The first question must be exactly: '간단히 자기소개 해주세요.'"
+        "The first question must be a self-introduction question in the same style."
     )
 
     user_text = (
@@ -172,11 +198,22 @@ def _generate_questions_llm(
 
     questions = _parse_questions(text or "")
 
-    if not questions or questions[0] != "간단히 자기소개 해주세요.":
-        questions = ["간단히 자기소개 해주세요."] + [q for q in questions if q]
+    if not questions or "자기소개" not in questions[0]:
+        if style == "pressure":
+            first = "자기소개를 1분 내로 핵심만 말해 주세요."
+        elif style == "friendly":
+            first = "편하게 자기소개 부탁드립니다."
+        else:
+            first = "간단히 자기소개 해주세요."
+        questions = [first] + [q for q in questions if q]
 
     while len(questions) < count:
-        questions.append("가장 어려웠던 상황과 해결 과정을 설명해 주세요.")
+        if style == "pressure":
+            questions.append("가장 어려웠던 상황과 해결 과정을 핵심만 말해 주세요.")
+        elif style == "friendly":
+            questions.append("가장 어려웠던 상황과 해결 과정을 편하게 설명해 주세요.")
+        else:
+            questions.append("가장 어려웠던 상황과 해결 과정을 설명해 주세요.")
 
     questions = questions[:count]
 
@@ -197,6 +234,7 @@ def generate_questions(
     self_intro_text: Optional[str],
     jd_text: Optional[str],
     count: int,
+    style: Optional[str] = None,
 ) -> List[dict]:
     count = max(1, count)
 
@@ -209,6 +247,7 @@ def generate_questions(
                 self_intro_text=self_intro_text,
                 jd_text=jd_text,
                 count=count,
+                style=style,
             )
         except Exception:
             pass
@@ -220,4 +259,5 @@ def generate_questions(
         self_intro_text=self_intro_text,
         jd_text=jd_text,
         count=count,
+        style=style,
     )

@@ -30,6 +30,7 @@ def start_session(payload: SessionStartRequest):
         self_intro_text=payload.self_intro_text,
         jd_text=payload.jd_text,
         count=payload.question_count or settings.default_question_count,
+        style=payload.style,
     )
     session = session_store.create_session(
         company_id=payload.company_id,

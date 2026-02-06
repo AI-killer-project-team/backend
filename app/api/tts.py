@@ -22,6 +22,14 @@ def _resolve_instructions(style: Optional[str], stored: Optional[str], override:
     return None
 
 
+def _resolve_voice(voice: Optional[str]) -> Optional[str]:
+    if voice == "male":
+        return "cedar"
+    if voice == "female":
+        return "nova"
+    return voice
+
+
 @router.post("/speak")
 def speak(payload: TtsRequest):
     session = session_store.get_session(payload.session_id)
@@ -36,7 +44,7 @@ def speak(payload: TtsRequest):
     if not text:
         raise HTTPException(status_code=400, detail="text or question_id required")
 
-    voice = payload.voice or session.voice or settings.tts_default_voice
+    voice = _resolve_voice(payload.voice or session.voice or settings.tts_default_voice)
     speed = payload.speed or session.tts_speed or settings.tts_default_speed
     instructions = _resolve_instructions(session.style, session.tts_instructions, payload.instructions)
 
