@@ -1,8 +1,10 @@
 ﻿from typing import Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
+
     default_question_count: int = 5
     time_limit_seconds: int = 120
     openai_api_key: Optional[str] = None
@@ -14,9 +16,6 @@ class Settings(BaseSettings):
     openai_tts_model: str = "gpt-4o-mini-tts"
     tts_default_voice: str = "alloy"
     tts_default_speed: float = 1.0
-
-    class Config:
-        env_file = ".env"
 
 
 settings = Settings()
