@@ -1,4 +1,5 @@
 ﻿from typing import List
+import re
 
 from app.schemas.report import ReportResponse, ReportSummary, AnswerTime
 from app.utils.stats import average, std_dev
@@ -59,12 +60,40 @@ def build_report(session) -> ReportResponse:
         "average_wpm_label": wpm_label(average_wpm),
     }
 
-    summary_lines: List[str] = []
-    if settings.openai_api_key and answers and any(a.transcript for a in answers):
-        try:
-            summary_lines = generate_summary_lines(summary, answers)
-        except Exception:
-            summary_lines = []
+    def is_unreliable_transcript(text: str) -> bool:
+        if not text:
+            return True
+        stripped = text.strip()
+        if len(stripped) < 20:
+            return True
+        if re.search(r"(.)\1{5,}", stripped):
+            return True
+        unique_ratio = len(set(stripped)) / max(len(stripped), 1)
+        if unique_ratio < 0.2:
+            return True
+        letters = re.findall(r"[A-Za-z가-힣]", stripped)
+        if len(letters) < 10:
+            return True
+        return False
+
+    reliable_answers = [a for a in answers if not is_unreliable_transcript(a.transcript or "")]
+
+    summary_lines: List[str] = session.summary_lines or []
+    if not summary_lines and reliable_answers:
+        if settings.openai_api_key:
+            try:
+                summary_lines = generate_summary_lines(summary, reliable_answers)
+                session.summary_lines = summary_lines
+            except Exception:
+                summary_lines = []
+
+    if not summary_lines:
+        summary_lines = [
+            "일부 답변이 면접 질문과 무관하거나 내용이 불분명했습니다.",
+            "의미 있는 사례, 역할, 결과를 포함해 답변의 정보량을 늘려보세요.",
+            "다음 인터뷰에서는 질문 의도를 먼저 정리한 뒤 핵심 근거로 답변해 주세요.",
+        ]
+        session.summary_lines = summary_lines
 
     answer_items: List[AnswerTime] = []
 
@@ -81,7 +110,11 @@ def build_report(session) -> ReportResponse:
             except Exception:
                 pass
 
-        if settings.openai_api_key and record.transcript and not record.feedback:
+        unreliable = is_unreliable_transcript(record.transcript or "")
+        if unreliable and not record.feedback:
+            record.feedback = "답변 인식이 불충분해 피드백을 생성하지 못했습니다. 조용한 환경에서 다시 답변해 주세요."
+
+        if settings.openai_api_key and record.transcript and not record.feedback and not unreliable:
             try:
                 feedback = generate_question_feedback(
                     company_id=session.company_id,

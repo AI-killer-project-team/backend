@@ -133,6 +133,33 @@ def _remove_duplicate_self_intro(questions: List[str]) -> List[str]:
     return result
 
 
+def _is_company_fit_question(text: str, company_name: str) -> bool:
+    keywords = ["인재상", "컬처", "문화", "가치", "핵심가치", "비전", "미션", "왜", "지원"]
+    if company_name and company_name in text:
+        return True
+    return any(k in text for k in keywords)
+
+
+def _ensure_company_last(questions: List[str], company_name: str, style: Optional[str]) -> List[str]:
+    if not questions:
+        return questions
+    last = questions[-1]
+    if _is_company_fit_question(last, company_name):
+        return questions
+
+    if style == "pressure":
+        last_q = f"{company_name}의 인재상과 문화에 비춰봤을 때 본인의 강점을 근거와 함께 말해 주세요."
+    elif style == "friendly":
+        last_q = f"{company_name}의 인재상과 문화에서 본인이 어떤 기여를 할 수 있을지 편하게 말씀해 주세요."
+    else:
+        last_q = f"{company_name}의 인재상과 문화와 연결해 본인의 강점을 설명해 주세요."
+
+    if any(_is_similar(last_q, q) for q in questions):
+        return questions
+
+    return questions[:-1] + [last_q]
+
+
 def _append_unique(base: List[str], candidates: List[str], threshold: float = 0.85) -> List[str]:
     result = base[:]
     for c in candidates:
@@ -323,6 +350,7 @@ def _generate_questions_rule_based(
 
     questions = questions[:count]
     questions = _sanitize_tone(questions, style)
+    questions = _ensure_company_last(questions, company_name, style)
 
     result = [
         {
@@ -480,6 +508,7 @@ def _generate_questions_llm(
         questions = _append_unique(questions, fallback)
 
     questions = questions[:count]
+    questions = _ensure_company_last(questions, company_name, style)
 
     return [
         {

@@ -28,6 +28,7 @@ class Session:
     tts_speed: Optional[float]
     questions: List[dict]
     answers: Dict[str, AnswerRecord] = field(default_factory=dict)
+    summary_lines: List[str] = field(default_factory=list)
     current_index: int = 0
     ended: bool = False
 
