@@ -63,13 +63,18 @@ async def submit_answer_audio(
 
         client = OpenAI(api_key=settings.openai_api_key)
         audio.file.seek(0)
-        result = client.audio.transcriptions.create(
-            model=settings.openai_stt_model,
-            file=audio.file,
-            response_format="text",
-        )
-        transcript = str(result).strip() if result else None
+        try:
+            result = client.audio.transcriptions.create(
+                model=settings.openai_stt_model,
+                file=audio.file,
+                response_format="text",
+            )
+            transcript = str(result).strip() if result else None
+        except Exception:
+            transcript = None
 
+    if transcript:
+        transcript = transcript.strip()
     word_count = len(transcript.split()) if transcript else 0
     wpm = (word_count / (answer_seconds / 60)) if answer_seconds > 0 else 0.0
 

@@ -28,16 +28,26 @@ def build_report(session) -> ReportResponse:
 
     average_wpm = average(wpm_values) if wpm_values else 0.0
 
+    def wpm_label(value: float) -> str:
+        if value <= 0:
+            return "알 수 없음"
+        if value < 120:
+            return "느림"
+        if value <= 170:
+            return "적정"
+        return "빠름"
+
     summary = {
         "average_seconds": avg,
         "min_seconds": mn,
         "max_seconds": mx,
         "std_dev_seconds": sd,
         "average_wpm": average_wpm,
+        "average_wpm_label": wpm_label(average_wpm),
     }
 
     summary_lines: List[str] = []
-    if settings.openai_api_key and answers:
+    if settings.openai_api_key and answers and any(a.transcript for a in answers):
         try:
             summary_lines = generate_summary_lines(summary, answers)
         except Exception:
@@ -67,6 +77,7 @@ def build_report(session) -> ReportResponse:
                 question_text=question_text,
                 answer_seconds=record.answer_seconds,
                 words_per_min=record.words_per_min,
+                wpm_label=wpm_label(record.words_per_min),
                 transcript=record.transcript,
                 model_answer=record.model_answer,
                 feedback=record.feedback,

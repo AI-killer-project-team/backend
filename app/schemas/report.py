@@ -7,6 +7,7 @@ class AnswerTime(BaseModel):
     question_text: str
     answer_seconds: float
     words_per_min: float
+    wpm_label: str
     transcript: Optional[str] = None
     model_answer: Optional[str] = None
     feedback: Optional[str] = None
@@ -18,6 +19,7 @@ class ReportSummary(BaseModel):
     max_seconds: float
     std_dev_seconds: float
     average_wpm: float
+    average_wpm_label: str
     summary_lines: List[str]
 
 
