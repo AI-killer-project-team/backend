@@ -59,19 +59,28 @@ def generate_question_feedback(
     }
 
     system_text = (
-        "You are an expert interview coach. "
-        "Your task is to provide constructive feedback for a candidate's interview answer. "
-        "First, generate a concise model answer structure (3-5 sentences, focusing on key points). "
-        "Second, provide a single, actionable sentence of feedback that highlights one strength and one area for improvement. "
-        "All output content in the JSON, specifically the 'model_answer' and 'feedback' values, must be in Korean. "
-        "Return ONLY a JSON object with keys: 'model_answer' and 'feedback'. "
-        "Do not include any extra text, markdown, or code blocks."
+        "당신은 면접 코치입니다. "
+        "후보자의 답변을 평가하고 개선점을 제시합니다. "
+        "먼저 해당 질문에 대한 모범 답변(3~5문장)을 작성하세요. "
+        "그 다음 답변 품질을 아래 5개 축으로 판단해 가장 약한 축을 한 가지 선택하고, "
+        "피드백에서 그 축을 정확히 지적해야 합니다. "
+        "평가 축: 관련성(질문과의 직접 연결), 구체성(상황/행동/결과/수치), 근거(경험/사례), 구조(도입-핵심-결론), 기업/직무 맥락 반영. "
+        "피드백은 반드시 한 문장으로 작성하며, "
+        "형식은 '강점: ...; 개선: ...; 다음 행동: ...'를 유지하세요. "
+        "후보자의 답변이 질문과 무관하거나 의미 없는 반복/무성의한 내용이면, "
+        "피드백에서 그 사실을 명확히 지적하고 구체화를 요구해야 합니다. "
+        "모든 출력은 한국어로 작성합니다. "
+        "반환 형식은 JSON 객체이며 키는 'model_answer'와 'feedback'만 허용됩니다. "
+        "추가 텍스트, 마크다운, 코드블록 없이 JSON만 반환하세요."
     )
 
     user_text = (
-        "Analyze the candidate's answer to the following question, considering the company's talent profile and culture fit, "
-        "and the job's key focus points. Provide a model answer that aligns with these contexts and feedback that helps the candidate improve. "
-        "Output must be ONLY a JSON object, with no extra commentary.\n"
+        "아래 컨텍스트를 참고해 질문과 답변을 평가하세요. "
+        "기업/직무 맥락을 반영한 모범 답변을 만들고, "
+        "피드백은 한 문장으로 작성하세요. "
+        "피드백에는 가장 약한 평가 축을 반드시 포함하고, "
+        "즉시 적용 가능한 다음 행동을 제시하세요. "
+        "답변이 질문과 무관하거나 내용이 빈약하면 그 사실을 피드백에 명확히 반영하세요.\n"
         f"Context: {json.dumps(prompt, ensure_ascii=False)}"
     )
 
@@ -139,16 +148,17 @@ def generate_model_answer(
     }
 
     system_text = (
-        "You are an expert interview coach. "
-        "Generate a concise model answer (3-5 sentences) that aligns with the company context and job focus points. "
-        "All output content must be in Korean. "
-        "Return ONLY a JSON object with key 'model_answer'. "
-        "Do not include any extra text, markdown, or code blocks."
+        "당신은 면접 코치입니다. "
+        "기업/직무 맥락에 맞는 간결한 모범 답변(3~5문장)을 작성하세요. "
+        "모든 출력은 한국어로 작성합니다. "
+        "반환 형식은 JSON 객체이며 키는 'model_answer'만 허용됩니다. "
+        "추가 텍스트, 마크다운, 코드블록 없이 JSON만 반환하세요."
     )
 
     user_text = (
-        "Provide a strong model answer for the question below, aligned to company culture and job focus. "
-        "Output must be ONLY a JSON object.\n"
+        "아래 질문에 대한 모범 답변을 작성하세요. "
+        "기업 문화와 직무 포인트를 반영해야 합니다. "
+        "출력은 JSON 객체만 허용됩니다.\n"
         f"Context: {json.dumps(prompt, ensure_ascii=False)}"
     )
 
@@ -201,12 +211,11 @@ def generate_summary_lines(
     }
 
     system_text = (
-        "You are an expert interview coach. "
-        "Summarize the candidate's overall interview performance in exactly three concise lines. "
-        "Each line should cover a distinct aspect: 1) overall strengths, 2) key areas for improvement, and 3) one actionable tip for the next interview. "
-        "All strings in the output JSON array must be in Korean. "
-        "Return ONLY a JSON array of strings. "
-        "Do not include any extra text, markdown, or code blocks."
+        "당신은 면접 코치입니다. "
+        "후보자의 전체 면접 수행을 정확히 3줄로 요약하세요. "
+        "각 줄은 다음을 반드시 다뤄야 합니다: 1) 전반적 강점, 2) 개선점, 3) 다음 면접을 위한 구체적 행동 팁. "
+        "출력은 한국어 JSON 배열이어야 하며 문자열만 포함합니다. "
+        "추가 텍스트, 마크다운, 코드블록 없이 JSON 배열만 반환하세요."
     )
     user_text = f"Context: {json.dumps(payload, ensure_ascii=False)}"
 
